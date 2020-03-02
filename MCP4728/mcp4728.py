@@ -1,6 +1,7 @@
 # mcp4728.py
 
 import smbus
+from math import ceil
 
 _defaultVDD = 5000
 _BASE_ADDR = 0x60
@@ -15,6 +16,41 @@ _GAINWRITE = 0B11000000
 _PWRDOWNWRITE = 0B10100000
 _GENERALCALL = 0B00000000
 _GAINWRITE = 0B11000000
+
+
+def value_to_bytes(value, bits=None):
+    """Convert a value in a string of 8 bit bytes, and return them in
+    a list with the most significant byte first"""
+    length = len(bin(value))-2
+    num_bytes = ceil(length/8.)
+
+    if bits is None:
+        pass
+    else:
+        if bits > length:
+            raise ValueError("Value is too large to fit in requested number of bits")
+        num_bytes = ceil(bits/8.)
+
+    return_bytes = []
+    for b in range(num_bytes)
+        b = num_bytes-b
+        byte_value = value >> 8*(b-1)
+        value = value - (byte_value << 8*(b-1))
+        return_bytes.append(byte_value)
+
+    return return_bytes
+
+
+def bytes_to_value(bytelist):
+    """Convert a sequence of bytes into an integer. Assumes most significant byte is first"""
+    length = len(bytelist)
+    value = 0
+    for b, byte in enumerate(bytelist):
+        bits = length(bin(byte)-2)
+        value += byte << (length-b)*bits
+
+    return value
+
 
 class MCP4728(object):
     """A class representing the MCP4728 device on the i2c bus"""
