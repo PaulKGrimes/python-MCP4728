@@ -32,6 +32,8 @@ import time
 """
 Control the MCP4728 DAC
 """
+
+
 class MCP4728:
     # internal variables
     __dac_address = 0x60
@@ -71,7 +73,7 @@ class MCP4728:
         try:
             return smbus.SMBus(i2c__bus)
         except IOError:
-            raise 'Could not open the i2c bus'
+            raise IOError('Could not open the i2c bus')
 
     # logical function: byte = (byte AND mask) OR value
     def __updatebyte(self, byte, mask, value):
@@ -90,83 +92,98 @@ class MCP4728:
 
     # writes multiple raw values to the specified DAC channels - channels 1 to 4, EEPROM not affected
     def multiple_raw(self, channels, reference, gains, values):
-        bytes=[]
+        byte_list = []
         for i in range(len(channels)):
             # first byte is 01000XXU, where XX is channel address (0-3)
-            first=self.__updatebyte(0x40,0xFF,(channels[i]-1) << 1)
-            bytes.append(first)
+            first = self.__updatebyte(0x40, 0xFF, (channels[i] - 1) << 1)
+            byte_list.append(first)
             # second word is XPPYDDDD DDDDDDDD, where X is reference, Y is gain and D is data
             second = list(divmod(values[i], 0x100))
-            second[0] =self.__updatebyte(second[0],0x0F,reference << 7 | gains[i] << 4)
-            bytes.extend(second)
-        self.__bus.write_i2c_block_data(self.__dac_address,bytes[0],bytes[1:])
+            second[0] = self.__updatebyte(second[0], 0x0F, reference << 7 | gains[i] << 4)
+            byte_list.extend(second)
+        self.__bus.write_i2c_block_data(self.__dac_address, byte_list[0], byte_list[1:])
         return
 
     # writes sequential raw values to the all DAC channels - channels 1 to 4, EEPROM affected
     def sequential_raw(self, reference, gains, values):
         # first byte is 0101000U for writing starting at channel 0
-        first=0x50
+        first = 0x50
         # second word is XPPYDDDD DDDDDDDD, where X is reference, Y is gain and D is data
-        seconds=[]
+        seconds = []
         for i in range(4):
             second = list(divmod(values[i], 0x100))
-            second[0] =self.__updatebyte(second[0],0x0F,reference << 7 | gains[i] << 4)
+            second[0] = self.__updatebyte(second[0], 0x0F, reference << 7 | gains[i] << 4)
             seconds.extend(second)
-        self.__bus.write_i2c_block_data(self.__dac_address,first,seconds)
+        self.__bus.write_i2c_block_data(self.__dac_address, first, seconds)
         return
 
     # writes single raw value to the selected DAC channel - channels 1 to 4, EEPROM affected
     def single_raw(self, channel, reference, gain, value):
         # first byte is 01011XXU, where XX is channel address (0-3)
-        first=self.__updatebyte(0x58,0xFF,(channel-1) << 1)
+        first = self.__updatebyte(0x58, 0xFF, (channel - 1) << 1)
         # second word is XPPYDDDD DDDDDDDD, where X is reference, Y is gain and D is data
         second = list(divmod(value, 0x100))
-        second[0] =self.__updatebyte(second[0],0x0F,reference << 7 | gain << 4)
-        self.__bus.write_i2c_block_data(self.__dac_address,first,second)
+        second[0] = self.__updatebyte(second[0], 0x0F, reference << 7 | gain << 4)
+        self.__bus.write_i2c_block_data(self.__dac_address, first, second)
         return
 
     # writes single value to the selected DAC channel using internal reference - channels 1 to 4
     def single_internal(self, channel, volt, eeprom):
-        if volt>2: gain=2
-        else: gain=1
-        value=int(0x1000 * volt/2.048/gain)
-        if eeprom: self.single_raw(channel,1,gain-1,value)
-        else: self.multiple_raw([channel],1,[gain-1],[value])
+        if volt > 2:
+            gain = 2
+        else:
+            gain = 1
+        value = int(0x1000 * volt / 2.048 / gain)
+        if eeprom:
+            self.single_raw(channel, 1, gain - 1, value)
+        else:
+            self.multiple_raw([channel], 1, [gain - 1], [value])
 
     # writes single value to the selected DAC channel using external reference - channels 1 to 4
     def single_external(self, channel, rel, eeprom):
-        value=int(0x1000 * rel)
-        if eeprom: self.single_raw(channel,0,0,value)
-        else: self.multiple_raw([channel],0,[0],[value])
+        value = int(0x1000 * rel)
+        if eeprom:
+            self.single_raw(channel, 0, 0, value)
+        else:
+            self.multiple_raw([channel], 0, [0], [value])
 
     # writes multiple values to the selected DAC channel using internal reference - channels 1 to 4
     def multiple_internal(self, volts, eeprom):
-        values=[]
-        gains=[]
+        values = []
+        gains = []
         for i in range(4):
-            if volts[i]>2: gain=2
-            else: gain=1
-            values.append(int(0x1000 * volts[i]/2.048/gain))
-            gains.append(gain-1)
-        if eeprom: self.sequential_raw(1,gains,values)
-        else: self.multiple_raw([1,2,3,4],1,gains,values)
+            if volts[i] > 2:
+                gain = 2
+            else:
+                gain = 1
+            values.append(int(0x1000 * volts[i] / 2.048 / gain))
+            gains.append(gain - 1)
+        if eeprom:
+            self.sequential_raw(1, gains, values)
+        else:
+            self.multiple_raw([1, 2, 3, 4], 1, gains, values)
 
     # writes multiple values to the selected DAC channel using external reference - channels 1 to 4
     def multiple_external(self, rels, eeprom):
-        values=[]
+        values = []
         for i in range(4):
             values.append(int(0x1000 * rels[i]))
-        if eeprom: self.sequential_raw(0,[0,0,0,0],values)
-        else: self.multiple_raw([1,2,3,4],0,[0,0,0,0],values)
+        if eeprom:
+            self.sequential_raw(0, [0, 0, 0, 0], values)
+        else:
+            self.multiple_raw([1, 2, 3, 4], 0, [0, 0, 0, 0], values)
+
 
 """
 Gets and sets the MCP4728 DAC address
 """
-class MCP4728_address:
+
+
+class MCP4728Address:
 
     # LOCAL METHODS
     # all assume and leave SCL low, except when specified differently
-    
+
     # following methods assume SCL and SDA high
     def __i2cstart(self):
         GPIO.setup(self.__sda_gpio, GPIO.OUT, initial=GPIO.LOW)
@@ -185,18 +202,20 @@ class MCP4728_address:
         GPIO.setup(self.__sda_gpio, GPIO.IN)
 
     def __i2cgetbyte(self):
-        num=0x00
+        num = 0x00
         GPIO.setup(self.__sda_gpio, GPIO.IN)
         for i in range(8):
             GPIO.setup(self.__scl_gpio, GPIO.IN)
             # I2C clock stretching
-            while(GPIO.input(self.__scl_gpio)==False): time.sleep(0.000001)
+            while not GPIO.input(self.__scl_gpio):
+                time.sleep(0.000001)
             num = num << 1
-            if(GPIO.input(self.__sda_gpio)==True): num = num | 0x01
+            if GPIO.input(self.__sda_gpio):
+                num = num | 0x01
             GPIO.setup(self.__scl_gpio, GPIO.OUT, initial=GPIO.LOW)
-        return(num)
+        return num
 
-    def __i2csendbyte(self,num):
+    def __i2csendbyte(self, num):
         for i in range(8):
             if num & 0x80 == 0:
                 GPIO.setup(self.__sda_gpio, GPIO.OUT, initial=GPIO.LOW)
@@ -209,9 +228,9 @@ class MCP4728_address:
     def __i2cgetack(self):
         GPIO.setup(self.__sda_gpio, GPIO.IN)
         GPIO.setup(self.__scl_gpio, GPIO.IN)
-        res=GPIO.input(self.__sda_gpio)
+        res = GPIO.input(self.__sda_gpio)
         GPIO.setup(self.__scl_gpio, GPIO.OUT, initial=GPIO.LOW)
-        return(not res)
+        return not res
 
     def __i2csendack(self):
         GPIO.setup(self.__sda_gpio, GPIO.OUT, initial=GPIO.LOW)
@@ -227,9 +246,9 @@ class MCP4728_address:
 
     # init object with GPIO addresses
     def __init__(self, scl, sda, ldac):
-        self.__scl_gpio=scl
-        self.__sda_gpio=sda
-        self.__ldac_gpio=ldac
+        self.__scl_gpio = scl
+        self.__sda_gpio = sda
+        self.__ldac_gpio = ldac
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
 
@@ -241,25 +260,28 @@ class MCP4728_address:
 
         self.__i2cstart()
         self.__i2csendbyte(0)
-        if(self.__i2cgetack()==False): print('No ACK G1')
+        if self.__i2cgetack() is False:
+            print('No ACK G1')
         self.__i2csendbyte(0x0C)
         GPIO.setup(self.__ldac_gpio, GPIO.OUT, initial=GPIO.LOW)
-        if(self.__i2cgetack()==False): print('No ACK G2')
+        if self.__i2cgetack() is False:
+            print('No ACK G2')
         self.__i2crestart()
         self.__i2csendbyte(0xC1)
         GPIO.setup(self.__ldac_gpio, GPIO.IN)
-        if(self.__i2cgetack()==False): print('No ACK G3')
+        if self.__i2cgetack() is False:
+            print('No ACK G3')
         val = self.__i2cgetbyte()
         self.__i2csendnack()
         self.__i2cstop()
         adr1 = (val & 0xE0) >> 5
         adr2 = (val & 0x0E) >> 1
-        if ((adr1 != adr2) or ((val & 0x11) != 0x10)):
+        if (adr1 != adr2) or ((val & 0x11) != 0x10):
             print('Error: returned {0:08b}'.format(val))
-        return(0x60 | adr1)
+        return 0x60 | adr1
 
     # sets the DAC address
-    def setaddress(self,cur,new):
+    def setaddress(self, cur, new):
         GPIO.setup(self.__scl_gpio, GPIO.IN)
         GPIO.setup(self.__sda_gpio, GPIO.IN)
         GPIO.setup(self.__ldac_gpio, GPIO.IN)
@@ -268,15 +290,19 @@ class MCP4728_address:
 
         self.__i2cstart()
         self.__i2csendbyte(0xC0 | (cur << 1))
-        if(self.__i2cgetack()==False): print('No ACK S1')
+        if self.__i2cgetack() is False:
+            print('No ACK S1')
         self.__i2csendbyte(0x61 | (cur << 2))
         GPIO.setup(self.__ldac_gpio, GPIO.OUT, initial=GPIO.LOW)
-        if(self.__i2cgetack()==False): print('No ACK S2')
+        if self.__i2cgetack() is False:
+            print('No ACK S2')
         self.__i2csendbyte(0x62 | (new << 2))
-        if(self.__i2cgetack()==False): print('No ACK S3')
+        if self.__i2cgetack() is False:
+            print('No ACK S3')
         self.__i2csendbyte(0x63 | (new << 2))
         GPIO.setup(self.__ldac_gpio, GPIO.IN)
-        if(self.__i2cgetack()==False): print('No ACK S4')
+        if self.__i2cgetack() is False:
+            print('No ACK S4')
         self.__i2cstop()
 
     # resets the DAC
@@ -287,7 +313,9 @@ class MCP4728_address:
 
         self.__i2cstart()
         self.__i2csendbyte(0x00)
-        if(self.__i2cgetack()==False): print('No ACK R1')
+        if self.__i2cgetack() is False:
+            print('No ACK R1')
         self.__i2csendbyte(0x06)
-        if(self.__i2cgetack()==False): print('No ACK R2')
+        if self.__i2cgetack() is False:
+            print('No ACK R2')
         self.__i2cstop()
