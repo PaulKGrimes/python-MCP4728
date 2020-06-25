@@ -18,21 +18,21 @@ _GENERALCALL = 0B00000000
 _GAINWRITE = 0B11000000
 
 
-def value_to_bytes(value, bits=None):
+def value_to_bytes(value, bits=16):
     """Convert a value in a string of 8 bit bytes, and return them in
     a list with the most significant byte first"""
     length = len(bin(value))-2
-    num_bytes = ceil(length/8.)
+    num_bytes = int(ceil(length/8.))
 
     if bits is None:
         pass
     else:
-        if bits > length:
+        if bits < length:
             raise ValueError("Value is too large to fit in requested number of bits")
-        num_bytes = ceil(bits/8.)
+        num_bytes = int(ceil(bits/8.))
 
     return_bytes = []
-    for b in range(num_bytes)
+    for b in range(num_bytes):
         b = num_bytes-b
         byte_value = value >> 8*(b-1)
         value = value - (byte_value << 8*(b-1))
@@ -68,43 +68,39 @@ class MCP4728(object):
         self._int_vref_ep = [None, None, None, None]
         self._gains_ep = [None, None, None, None]
         self._power_down_ep = [None, None, None, None]
-
-
-    def begin(self):
-        """Start the I2C connection and get current values of MCP4728"""
-        Wire.begin()
-        self.get_status()
+        
+        self._get_status()
 
     def reset(self):
         """General reset of MCP4728 - EEProm values will be loaded to input register"""
-        return _simple_command(_RESET)
+        return self._simple_command(_RESET)
 
     def wake(self):
         """General wake-up call of MCP4728"""
-        return _simple_command(_WAKE)
+        return self._simple_command(_WAKE)
 
     def update(self):
         """General software update of MCP4728 - All DAC outputs update"""
-        return _simple_command(_UPDATE)
+        return self._simple_command(_UPDATE)
 
     def analog_write_all(self, values):
-        """Write input register values to each channel using fastwrite method.
+        """Write input register values to each channel using fast_write method.
 
         Parameters:
             values: list: of four integers in range 0-4095"""
         if len(value) != 4:
             raise ValueError("Must pass four values to be written")
         self._values = values
-        return fast_write()
+        return self.fast_write()
 
     def analog_write(self, channel, value):
-        """Write input register value to specified channel using fastwrite method
+        """Write input register value to specified channel using fast_write method
 
         parameters:
             channel: int 0-3: input channel
             value: int 0-4095: value to write"""
         self._values[channel] = value
-        return fast_write()
+        return self.fast_write()
 
     def eeprom_write_all(self, values):
         """Write values to each channel using Sequential Write method.
@@ -119,10 +115,12 @@ class MCP4728(object):
 
         return self.seq_write()
 
-    def eeprom_write(self):
+    def eeprom_write(self, channel, value):
         """Write all current values to EEProm using seq_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
-        return self.seq_write()
+        self._values_ep[channel] = value
+        self._values[channel] = value
+        return self.single_write(channel)
 
     def eeprom_reset(self):
         """Set all EEProm values to the factory default"""
@@ -133,6 +131,64 @@ class MCP4728(object):
             self._power_down[n] = 0
 
         self.seq_write()
+        
+    def fast_write(self):
+        """FastWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.1
+        DAC Input and PowerDown bits update.
+        No EEPROM update"""
+        block = []
+        
+        for channel in range(len(self._values)):
+            val_word = value_to_bytes(self._values[channel])
+            block.append(val_word[0])
+            block.append(val_word[1])
+            
+        self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
+            
+        
+    def single_write(self, channel):
+        """SingleWrite input register and EEPROM - a DAC ouput update. 
+        refer to DATASHEET 5.6.4
+        DAC Input, Gain, Vref and PowerDown bits update
+        EEPROM update"""
+        val_word = value_to_bytes(self._values[channel])
+        
+        first = _SINGLEWRITE | (channel << 1)
+        second = self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0]
+        third = val_word[1]
+        
+        self._bus.write_i2c_block_data(self._dev_address, first, [second, third])
+        
+        
+    def multi_write(self):
+        """MultiWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.2
+        DAC Input, Gain, Vref and PowerDown bits update
+        No EEPROM update"""
+        block = []
+        
+        for channel in range(len(self._values)):
+            val_word = value_to_bytes(self._values[channel])
+            block.append(_MULTIWRITE | (channel << 1))
+            block.append(self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
+            block.append(val_word[1])
+            
+        self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
+        
+        
+    def seq_write(self):
+        """Sqeuential Write input register values - All DAC ouput update. refer to DATASHEET 5.6.2
+        DAC Input, Gain, Vref and PowerDown bits update
+        No EEPROM update"""
+        block = []
+        
+        for channel in range(len(self._values)):
+            val_word = value_to_bytes(self._values[channel])
+            block.append(_SEQWRITE)
+            block.append(self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
+            block.append(val_word[1])
+            
+        self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
+        
 
     def set_vref_all(self, values):
         """Write the voltage reference settings to input registers"""
@@ -216,7 +272,7 @@ class MCP4728(object):
 
     def get_vout(self, channel):
         """Return the current Vout of a channel in millivolts"""
-        if self._int_vref[channel] = 1:
+        if self._int_vref[channel] == 1:
             vref = 2048
         else:
             vref = self._vdd
@@ -227,7 +283,7 @@ class MCP4728(object):
 
     def vout_write(self, channel, vout):
         """Write a voltage value in millivolts to one channel"""
-        if self._int_vref[channel] = 1:
+        if self._int_vref[channel] == 1:
             vref = 2048
         else:
             vref = self._vdd
@@ -241,8 +297,8 @@ class MCP4728(object):
         if len(vout) != 4:
             raise ValueError("Must supply four voltages")
         values = [0, 0, 0, 0]
-        for channel in range(4)
-            if self._int_vref[channel] = 1:
+        for channel in range(4):
+            if self._int_vref[channel] == 1:
                 vref = 2048
             else:
                 vref = self._vdd
@@ -253,7 +309,7 @@ class MCP4728(object):
 
     def _get_status(self):
         """Get the current values from the MCP4728"""
-        status = bus.read_i2c_block_data(0x60, 0x02, 24)
+        status = self._bus.read_i2c_block_data(self._dev_address, 0x02, 24)
         for n in range(4):
             deviceID = status[n*6]
             channel = (deviceID & 0b00110000) >> 4
@@ -279,5 +335,5 @@ class MCP4728(object):
 
     def _simple_command(self, command):
         """Send a simple byte command to the SMBus"""
-        self._bus.write_i2c_byte(self._dev_address, command)
+        self._bus.write_byte_data(self._dev_address, _GENERALCALL, command)
         return
