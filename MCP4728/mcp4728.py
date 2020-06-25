@@ -68,7 +68,7 @@ class MCP4728(object):
         self._int_vref_ep = [None, None, None, None]
         self._gains_ep = [None, None, None, None]
         self._power_down_ep = [None, None, None, None]
-        
+
         self._get_status()
 
     def reset(self):
@@ -131,67 +131,71 @@ class MCP4728(object):
             self._power_down[n] = 0
 
         self.seq_write()
-        
+
     def fast_write(self):
         """FastWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.1
         DAC Input and PowerDown bits update.
         No EEPROM update"""
         block = []
-        
+
         for channel in range(len(self._values)):
             val_word = value_to_bytes(self._values[channel])
             block.append(val_word[0])
             block.append(val_word[1])
-            
+
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
-            
-        
+
+
     def single_write(self, channel):
-        """SingleWrite input register and EEPROM - a DAC ouput update. 
+        """SingleWrite input register and EEPROM - a DAC ouput update.
         refer to DATASHEET 5.6.4
         DAC Input, Gain, Vref and PowerDown bits update
         EEPROM update"""
         val_word = value_to_bytes(self._values[channel])
-        
+
         first = _SINGLEWRITE | (channel << 1)
         second = self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0]
         third = val_word[1]
-        
+
         self._bus.write_i2c_block_data(self._dev_address, first, [second, third])
-        
-        
+
+
     def multi_write(self):
         """MultiWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.2
         DAC Input, Gain, Vref and PowerDown bits update
         No EEPROM update"""
         block = []
-        
+
         for channel in range(len(self._values)):
             val_word = value_to_bytes(self._values[channel])
             block.append(_MULTIWRITE | (channel << 1))
             block.append(self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
             block.append(val_word[1])
-            
+
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
-        
-        
+
+
     def seq_write(self):
         """Sqeuential Write input register values - All DAC ouput update. refer to DATASHEET 5.6.2
         DAC Input, Gain, Vref and PowerDown bits update
         No EEPROM update"""
         block = []
-        
+
         for channel in range(len(self._values)):
             val_word = value_to_bytes(self._values[channel])
             block.append(_SEQWRITE)
             block.append(self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
             block.append(val_word[1])
-            
+
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
-        
+
+    def write_vref(self):
+        """Write the voltage reference settings to the input register"""
+        data = _VREFWRITE | self._int_vref[0] << 3 | self._int_vref[1] << 2 | self._int_vref[2] << 1 | self._int_vref[3]
+        self._bus.write_byte(self._dev_address, data)
 
     def set_vref_all(self, values):
-        """Write the voltage reference settings to input registers"""
+        """Set the voltage reference settings and write them to input registers"""
         if len(values) != 4:
             raise ValueError("Must pass four values")
         self._int_vref = values
@@ -199,9 +203,13 @@ class MCP4728(object):
 
     def set_vref(self, channel, value):
         """Write the voltage reference settings for one channel to input registers"""
-
         self._int_vref[channel] = value
         return self.write_vref()
+
+    def write_gain(self):
+        """Write the gain settings to the input register"""
+        data = _GAINWRITE | self._gains[0] << 3 | self._gains[1] << 2 | self._gains[2] << 1 | self._gains[3]
+        self._bus.write_byte(self._dev_address, data)
 
     def set_gain_all(self, value1, value2, value3, value4):
         """Write the gain setting to input registers"""
@@ -215,6 +223,12 @@ class MCP4728(object):
         """Write the gain setting for one channel to input registers"""
         self._gains[channel] = value
         return self.write_gain()
+
+    def write_power_down(self):
+        """Write the gain settings to the input register"""
+        cmd = _PWRDOWNWRITE | self._power_down[0] << 2 | self._power_down[1]
+        data = self._power_down[2] << 6 | self._power_down[3] << 4
+        self._bus.write_byte_data(self._dev_address, cmd, data)
 
     def set_power_down_all(self, value1, value2, value3, value4):
         """Write the gain setting to input registers"""
