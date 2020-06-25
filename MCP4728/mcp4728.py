@@ -1,5 +1,8 @@
 # mcp4728.py
 
+from __future__ import print_function
+from __future__ import division
+
 import smbus
 from math import ceil
 
@@ -15,7 +18,6 @@ _VREFWRITE = 0B10000000
 _GAINWRITE = 0B11000000
 _PWRDOWNWRITE = 0B10100000
 _GENERALCALL = 0B00000000
-_GAINWRITE = 0B11000000
 
 
 def value_to_bytes(value, bits=16):
@@ -187,6 +189,7 @@ class MCP4728(object):
             block.append(self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
             block.append(val_word[1])
 
+        print(block)
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
     def write_vref(self):
@@ -291,7 +294,7 @@ class MCP4728(object):
         else:
             vref = self._vdd
 
-        vout = vref * self._values[channel] * (self._gains[channel] + 1) / 4096
+        vout = vref * self._values[channel] * (self._gains[channel]*self._int_vref[channel] + 1) / 4096
 
         return vout
 
@@ -302,7 +305,12 @@ class MCP4728(object):
         else:
             vref = self._vdd
 
-        value = (vout * 4096) / (vref * (self._gains[channel] + 1))
+        value = int((vout * 4095) / (vref * (self._gains[channel]*self._int_vref[channel] + 1)))
+
+        if value > 4095:
+            value = 4095
+        if value < 0:
+            value = 0
 
         self.analog_write(channel, value)
 
@@ -316,8 +324,14 @@ class MCP4728(object):
                 vref = 2048
             else:
                 vref = self._vdd
+                
+            values[channel] = int((vout[channel] * 4095) / (vref * (self._gains[channel]*self._int_vref[channel] + 1)))
 
-            values[n] = (vout[n] * 4096) / (vref * (self._gains[n] + 1))
+            if values[channel] > 4095:
+                values[channel] = 4095
+            if values[channel] < 0:
+                values[channel] = 0
+
 
         self.analog_write_all(values)
 
