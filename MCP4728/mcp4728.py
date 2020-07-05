@@ -411,7 +411,7 @@ class MCP4728(object):
                 hi_byte = status[n * 6 + 4]
                 lo_byte = status[n * 6 + 5]
 
-            print("{:#010b} : {:d}".format(hi_byte, hi_byte & 0b00001111 << 8))
+            print("{:#010b} : {:d}".format(hi_byte, (hi_byte & 0b00001111) << 8))
             print("{:#010b} : {:d}".format(lo_byte, lo_byte))
 
             self._int_vref_ep[n] = (hi_byte & 0b10000000) >> 7
