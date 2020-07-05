@@ -112,14 +112,12 @@ class MCP4728(object):
         self.seq_write()
         # Call twice as first time doesn't work quite right.
         self.update_status()
-        self.update_status()
 
     def eeprom_write(self, channel):
         """Write current values to EEProm for channel using single_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
         self.single_write(channel)
         # Call twice as first time doesn't work quite right.
-        self.update_status()
         self.update_status()
 
     def eeprom_reset(self):
@@ -146,7 +144,7 @@ class MCP4728(object):
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
     def single_write(self, channel):
-        """SingleWrite input register and EEPROM - a DAC ouput update.
+        """SingleWrite input register and EEPROM with a DAC output update.
         refer to DATASHEET 5.6.4
         DAC Input, Gain, Vref and PowerDown bits update
         EEPROM is updated"""
@@ -156,6 +154,7 @@ class MCP4728(object):
         second = self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0]
         third = val_word[1]
 
+        print(bin(first), second, third)
         self._bus.write_i2c_block_data(self._dev_address, first, [second, third])
 
     def multi_write(self):
