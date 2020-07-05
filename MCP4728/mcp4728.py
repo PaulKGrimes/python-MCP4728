@@ -409,8 +409,8 @@ class MCP4728(object):
             if invert_eeprom:
                 print("{:#010b} : {:d}".format(hi_byte, hi_byte & 0b00001111 << 8 ))
                 print("{:#010b} : {:d}".format(lo_byte, lo_byte))
-                hi_byte = ~status[n * 6 + 4]
-                lo_byte = ~status[n * 6 + 5]
+                hi_byte = status[n * 6 + 4] + 0b11110000
+                lo_byte = status[n * 6 + 5]
             else:
                 hi_byte = status[n * 6 + 4]
                 lo_byte = status[n * 6 + 5]
