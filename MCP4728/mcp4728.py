@@ -5,6 +5,7 @@ from __future__ import division
 
 import smbus
 from math import ceil
+from time import sleep
 
 _defaultVDD = 5000
 _BASE_ADDR = 0x60
@@ -109,12 +110,14 @@ class MCP4728(object):
         """Write all current values to each channel using Sequential Write method.
         This will update both the input register and EEProm stored values"""
         self.seq_write()
+        sleep(0.001)
         self.update_status()
 
     def eeprom_write(self, channel):
         """Write current values to EEProm for channel using single_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
         self.single_write(channel)
+        sleep(0.001)
         self.update_status()
 
     def eeprom_reset(self):
