@@ -369,6 +369,18 @@ class MCP4728(object):
 
         self.set_value_all(values)
 
+    def print_status(self):
+        """Print the current values"""
+        print("Device ID     :", self._device_id)
+        print("Values        :", self._values)
+        print("Values EEProm :", self._values_ep)
+        print("Vref          :", self._int_vref)
+        print("Vref EEProm   :", self._int_vref_ep)
+        print("Gain          :", self._gains)
+        print("Gain EEProm   :", self._gains_ep)
+        print("Power         :", self._power_down)
+        print("Power EEProm  :", self._power_down_ep)
+
     def update_status(self, invert_eeprom=False):
         """Get the current values from the MCP4728.
         For some reason, the eeprom return bits are inverted after a sequential write.
@@ -377,8 +389,8 @@ class MCP4728(object):
             invert_eeprom - if True, invert the eeprom statuses."""
         status = self._bus.read_i2c_block_data(self._dev_address, 0x02, 24)
         for by in status:
-            print(bin(by))
-            
+            print("{:8b}".format(by))
+
         for n in range(4):
             device_id = status[n * 6]
             channel = (device_id & 0b00110000) >> 4
@@ -395,8 +407,8 @@ class MCP4728(object):
             if channel != n:
                 raise RuntimeError("Error reading status from MCP4728 device")
             if invert_eeprom:
-                print(hi_byte)
-                print(lo_byte)
+                print("{:8b}".format(hi_byte))
+                print("{:8b}".format(lo_byte))
                 hi_byte = ~status[n * 6 + 4]
                 lo_byte = ~status[n * 6 + 5]
             else:
