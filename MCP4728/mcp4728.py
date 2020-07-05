@@ -110,13 +110,13 @@ class MCP4728(object):
         """Write all current values to each channel using Sequential Write method.
         This will update both the input register and EEProm stored values"""
         self.seq_write()
-        self.update_status()
+        self.update_status(invert_eeprom=True)
 
     def eeprom_write(self, channel):
         """Write current values to EEProm for channel using single_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
         self.single_write(channel)
-        self.update_status()
+        self.update_status(invert_eeprom=True)
 
     def eeprom_reset(self):
         """Set all EEProm values to the factory default"""
@@ -369,8 +369,12 @@ class MCP4728(object):
 
         self.set_value_all(values)
 
-    def update_status(self):
-        """Get the current values from the MCP4728"""
+    def update_status(self, invert_eeprom=False):
+        """Get the current values from the MCP4728.
+        For some reason, the eeprom return bits are inverted after a sequential write.
+
+        Parameters:
+            invert_eeprom - if True, invert the eeprom statuses."""
         status = self._bus.read_i2c_block_data(self._dev_address, 0x02, 24)
         for n in range(4):
             device_id = status[n * 6]
@@ -387,8 +391,12 @@ class MCP4728(object):
             channel = (device_id & 0b00110000) >> 4
             if channel != n:
                 raise RuntimeError("Error reading status from MCP4728 device")
-            hi_byte = status[n * 6 + 4]
-            lo_byte = status[n * 6 + 5]
+            if invert_eeprom:
+                hi_byte = ~status[n * 6 + 4]
+                lo_byte = ~status[n * 6 + 5]
+            else:
+                hi_byte = status[n * 6 + 4]
+                lo_byte = status[n * 6 + 5]
             self._int_vref_ep[n] = (hi_byte & 0b10000000) >> 7
             self._gains_ep[n] = (hi_byte & 0b00010000) >> 4
             self._power_down_ep[n] = (hi_byte & 0b0110000) >> 5
