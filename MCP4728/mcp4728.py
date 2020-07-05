@@ -110,14 +110,16 @@ class MCP4728(object):
         """Write all current values to each channel using Sequential Write method.
         This will update both the input register and EEProm stored values"""
         self.seq_write()
-        sleep(0.001)
+        # Call twice as first time doesn't work quite right.
+        self.update_status()
         self.update_status()
 
     def eeprom_write(self, channel):
         """Write current values to EEProm for channel using single_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
         self.single_write(channel)
-        sleep(0.001)
+        # Call twice as first time doesn't work quite right.
+        self.update_status()
         self.update_status()
 
     def eeprom_reset(self):
