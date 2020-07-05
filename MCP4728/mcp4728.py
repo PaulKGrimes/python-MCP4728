@@ -23,21 +23,21 @@ _GENERALCALL = 0B00000000
 def value_to_bytes(value, bits=16):
     """Convert a value in a string of 8 bit bytes, and return them in
     a list with the most significant byte first"""
-    length = len(bin(value))-2
-    num_bytes = int(ceil(length/8.))
+    length = len(bin(value)) - 2
+    num_bytes = int(ceil(length / 8.))
 
     if bits is None:
         pass
     else:
         if bits < length:
             raise ValueError("Value is too large to fit in requested number of bits")
-        num_bytes = int(ceil(bits/8.))
+        num_bytes = int(ceil(bits / 8.))
 
     return_bytes = []
     for b in range(num_bytes):
-        b = num_bytes-b
-        byte_value = value >> 8*(b-1)
-        value = value - (byte_value << 8*(b-1))
+        b = num_bytes - b
+        byte_value = value >> 8 * (b - 1)
+        value = value - (byte_value << 8 * (b - 1))
         return_bytes.append(byte_value)
 
     return return_bytes
@@ -48,28 +48,29 @@ def bytes_to_value(bytelist):
     length = len(bytelist)
     value = 0
     for b, byte in enumerate(bytelist):
-        bits = length(bin(byte)-2)
-        value += byte << (length-b)*bits
+        bits = len(bin(byte)) - 2
+        value += byte << (length - b) * bits
 
     return value
 
 
 class MCP4728(object):
     """A class representing the MCP4728 device on the i2c bus"""
-    def __init__(self, deviceID = 0x00):
+
+    def __init__(self, device_id=0x00):
         """Create a MCP4728 object"""
         self._bus = smbus.SMBus(1)
-        self._deviceID = deviceID
-        self._dev_address = (_BASE_ADDR | self._deviceID)
+        self._device_id = device_id
+        self._dev_address = (_BASE_ADDR | self._device_id)
         self._vdd = _defaultVDD
-        self._values = [None, None, None, None]
-        self._int_vref = [None, None, None, None]
-        self._gains = [None, None, None, None]
-        self._power_down = [None, None, None, None]
-        self._values_ep = [None, None, None, None]
-        self._int_vref_ep = [None, None, None, None]
-        self._gains_ep = [None, None, None, None]
-        self._power_down_ep = [None, None, None, None]
+        self._values = [0, 0, 0, 0]
+        self._int_vref = [0, 0, 0, 0]
+        self._gains = [0, 0, 0, 0]
+        self._power_down = [0, 0, 0, 0]
+        self._values_ep = [0, 0, 0, 0]
+        self._int_vref_ep = [0, 0, 0, 0]
+        self._gains_ep = [0, 0, 0, 0]
+        self._power_down_ep = [0, 0, 0, 0]
 
         self._get_status()
 
@@ -90,7 +91,7 @@ class MCP4728(object):
 
         Parameters:
             values: list: of four integers in range 0-4095"""
-        if len(value) != 4:
+        if len(values) != 4:
             raise ValueError("Must pass four values to be written")
         self._values = values
         return self.fast_write()
@@ -147,7 +148,6 @@ class MCP4728(object):
 
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
-
     def single_write(self, channel):
         """SingleWrite input register and EEPROM - a DAC ouput update.
         refer to DATASHEET 5.6.4
@@ -161,7 +161,6 @@ class MCP4728(object):
 
         self._bus.write_i2c_block_data(self._dev_address, first, [second, third])
 
-
     def multi_write(self):
         """MultiWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.2
         DAC Input, Gain, Vref and PowerDown bits update
@@ -171,11 +170,11 @@ class MCP4728(object):
         for channel in range(len(self._values)):
             val_word = value_to_bytes(self._values[channel])
             block.append(_MULTIWRITE | (channel << 1))
-            block.append(self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
+            block.append(
+                self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
             block.append(val_word[1])
 
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
-
 
     def seq_write(self):
         """Sqeuential Write input register values - All DAC ouput update. refer to DATASHEET 5.6.2
@@ -186,7 +185,8 @@ class MCP4728(object):
         for channel in range(len(self._values)):
             val_word = value_to_bytes(self._values[channel])
             block.append(_SEQWRITE)
-            block.append(self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
+            block.append(
+                self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
             block.append(val_word[1])
 
         print(block)
@@ -215,7 +215,7 @@ class MCP4728(object):
         self._bus.write_byte(self._dev_address, data)
 
     def set_gain_all(self, value1, value2, value3, value4):
-        """Write the gain setting to input registers"""
+        """Write the gain settings to input registers"""
         self._gains[0] = value1
         self._gains[1] = value2
         self._gains[2] = value3
@@ -228,13 +228,13 @@ class MCP4728(object):
         return self.write_gain()
 
     def write_power_down(self):
-        """Write the gain settings to the input register"""
+        """Write the power down setting to the input register"""
         cmd = _PWRDOWNWRITE | self._power_down[0] << 2 | self._power_down[1]
         data = self._power_down[2] << 6 | self._power_down[3] << 4
         self._bus.write_byte_data(self._dev_address, cmd, data)
 
     def set_power_down_all(self, value1, value2, value3, value4):
-        """Write the gain setting to input registers"""
+        """Write the power down settings to input registers"""
         self._power_down[0] = value1
         self._power_down[1] = value2
         self._power_down[2] = value3
@@ -247,9 +247,9 @@ class MCP4728(object):
         return self.write_power_down()
 
     @property
-    def deviceID(self):
+    def device_id(self):
         """Return the device ID"""
-        return self._deviceID
+        return self._device_id
 
     def get_vref(self, channel):
         """Return the vref setting of a channel"""
@@ -294,7 +294,7 @@ class MCP4728(object):
         else:
             vref = self._vdd
 
-        vout = vref * self._values[channel] * (self._gains[channel]*self._int_vref[channel] + 1) / 4096
+        vout = vref * self._values[channel] * (self._gains[channel] * self._int_vref[channel] + 1) / 4096
 
         return vout
 
@@ -305,7 +305,7 @@ class MCP4728(object):
         else:
             vref = self._vdd
 
-        value = int((vout * 4095) / (vref * (self._gains[channel]*self._int_vref[channel] + 1)))
+        value = int((vout * 4095) / (vref * (self._gains[channel] * self._int_vref[channel] + 1)))
 
         if value > 4095:
             value = 4095
@@ -324,14 +324,14 @@ class MCP4728(object):
                 vref = 2048
             else:
                 vref = self._vdd
-                
-            values[channel] = int((vout[channel] * 4095) / (vref * (self._gains[channel]*self._int_vref[channel] + 1)))
+
+            values[channel] = int(
+                (vout[channel] * 4095) / (vref * (self._gains[channel] * self._int_vref[channel] + 1)))
 
             if values[channel] > 4095:
                 values[channel] = 4095
             if values[channel] < 0:
                 values[channel] = 0
-
 
         self.analog_write_all(values)
 
@@ -339,27 +339,26 @@ class MCP4728(object):
         """Get the current values from the MCP4728"""
         status = self._bus.read_i2c_block_data(self._dev_address, 0x02, 24)
         for n in range(4):
-            deviceID = status[n*6]
-            channel = (deviceID & 0b00110000) >> 4
+            device_id = status[n * 6]
+            channel = (device_id & 0b00110000) >> 4
             if channel != n:
                 raise RuntimeError("Error reading status from MCP4728 device")
-            hi_byte = status[n*6+1]
-            lo_byte = status[n*6+2]
+            hi_byte = status[n * 6 + 1]
+            lo_byte = status[n * 6 + 2]
             self._int_vref[n] = (hi_byte & 0b10000000) >> 7
             self._gains[n] = (hi_byte & 0b00010000) >> 4
             self._power_down[n] = (hi_byte & 0b0110000) >> 5
             self._values[n] = ((hi_byte & 0b00001111) << 8) + lo_byte
-            deviceID = status[n*6+3]
-            channel = (deviceID & 0b00110000) >> 4
+            device_id = status[n * 6 + 3]
+            channel = (device_id & 0b00110000) >> 4
             if channel != n:
                 raise RuntimeError("Error reading status from MCP4728 device")
-            hi_byte = status[n*6+4]
-            lo_byte = status[n*6+5]
+            hi_byte = status[n * 6 + 4]
+            lo_byte = status[n * 6 + 5]
             self._int_vref_ep[n] = (hi_byte & 0b10000000) >> 7
             self._gains_ep[n] = (hi_byte & 0b00010000) >> 4
             self._power_down_ep[n] = (hi_byte & 0b0110000) >> 5
             self._values_ep[n] = ((hi_byte & 0b00001111) << 8) + lo_byte
-
 
     def _simple_command(self, command):
         """Send a simple byte command to the SMBus"""
