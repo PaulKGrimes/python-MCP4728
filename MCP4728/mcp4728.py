@@ -110,14 +110,12 @@ class MCP4728(object):
         """Write all current values to each channel using Sequential Write method.
         This will update both the input register and EEProm stored values"""
         self.seq_write()
-        # Call twice as first time doesn't work quite right.
         self.update_status()
 
     def eeprom_write(self, channel):
         """Write current values to EEProm for channel using single_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
         self.single_write(channel)
-        # Call twice as first time doesn't work quite right.
         self.update_status()
 
     def eeprom_reset(self):
@@ -172,15 +170,18 @@ class MCP4728(object):
 
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
-    def seq_write(self):
-        """Sqeuential Write input register values - All DAC ouput update. refer to DATASHEET 5.6.2
+    def seq_write(self, start_channel=0):
+        """Sequential Write ALL input register values - All DAC ouput update. refer to DATASHEET 5.6.2
         DAC Input, Gain, Vref and PowerDown bits update
-        EEPROM is updated"""
-        block = []
+        EEPROM is updated.
 
-        for channel in range(len(self._values)):
+        Parameters:
+            start_channel :int: - first channel to write. Will write values from start_channel to 3"""
+        block = [_SEQWRITE | start_channel << 1]
+
+        for channel in range(start_channel, len(self._values)):
             val_word = value_to_bytes(self._values[channel])
-            block.append(_SEQWRITE)
+
             block.append(
                 self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
             block.append(val_word[1])
