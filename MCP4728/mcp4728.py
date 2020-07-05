@@ -405,8 +405,8 @@ class MCP4728(object):
             if channel != n:
                 raise RuntimeError("Error reading status from MCP4728 device")
             if invert_eeprom:
-                hi_byte = ~status[n * 6 + 4]
-                lo_byte = ~status[n * 6 + 5]
+                hi_byte = ~status[n * 6 + 4] & 0b11111111
+                lo_byte = ~status[n * 6 + 5] & 0b11111111
             else:
                 hi_byte = status[n * 6 + 4]
                 lo_byte = status[n * 6 + 5]
