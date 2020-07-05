@@ -108,12 +108,14 @@ class MCP4728(object):
     def eeprom_write_all(self):
         """Write all current values to each channel using Sequential Write method.
         This will update both the input register and EEProm stored values"""
-        return self.seq_write()
+        self.seq_write()
+        self.update_status()
 
     def eeprom_write(self, channel):
         """Write current values to EEProm for channel using single_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
-        return self.single_write(channel)
+        self.single_write(channel)
+        self.update_status()
 
     def eeprom_reset(self):
         """Set all EEProm values to the factory default"""
@@ -123,7 +125,7 @@ class MCP4728(object):
             self._gains[n] = 0
             self._power_down[n] = 0
 
-        self.seq_write()
+        self.eeprom_write_all()
 
     def fast_write(self):
         """FastWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.1
