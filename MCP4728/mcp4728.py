@@ -388,8 +388,6 @@ class MCP4728(object):
         Parameters:
             invert_eeprom - if True, invert the eeprom statuses."""
         status = self._bus.read_i2c_block_data(self._dev_address, 0x02, 24)
-        for by in status:
-            print("{:#010b}".format(by))
 
         for n in range(4):
             device_id = status[n * 6]
@@ -407,13 +405,15 @@ class MCP4728(object):
             if channel != n:
                 raise RuntimeError("Error reading status from MCP4728 device")
             if invert_eeprom:
-                print("{:#010b} : {:d}".format(hi_byte, hi_byte & 0b00001111 << 8 ))
-                print("{:#010b} : {:d}".format(lo_byte, lo_byte))
-                hi_byte = status[n * 6 + 4] + 0b11110000
-                lo_byte = status[n * 6 + 5]
+                hi_byte = ~status[n * 6 + 4]
+                lo_byte = ~status[n * 6 + 5]
             else:
                 hi_byte = status[n * 6 + 4]
                 lo_byte = status[n * 6 + 5]
+
+            print("{:#010b} : {:d}".format(hi_byte, hi_byte & 0b00001111 << 8))
+            print("{:#010b} : {:d}".format(lo_byte, lo_byte))
+
             self._int_vref_ep[n] = (hi_byte & 0b10000000) >> 7
             self._gains_ep[n] = (hi_byte & 0b00010000) >> 4
             self._power_down_ep[n] = (hi_byte & 0b0110000) >> 5
