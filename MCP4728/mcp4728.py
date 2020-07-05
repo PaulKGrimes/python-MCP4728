@@ -152,7 +152,6 @@ class MCP4728(object):
         second = self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0]
         third = val_word[1]
 
-        print(bin(first), second, third)
         self._bus.write_i2c_block_data(self._dev_address, first, [second, third])
 
     def multi_write(self):
@@ -186,7 +185,6 @@ class MCP4728(object):
                 self._int_vref[channel] << 7 | self._power_down[channel] << 5 | self._gains[channel] << 4 | val_word[0])
             block.append(val_word[1])
 
-        print(block)
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
     def write_vref(self):
