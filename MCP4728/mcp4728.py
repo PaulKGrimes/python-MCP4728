@@ -405,14 +405,11 @@ class MCP4728(object):
             if channel != n:
                 raise RuntimeError("Error reading status from MCP4728 device")
             if invert_eeprom:
-                hi_byte = ~status[n * 6 + 4] & 0b11111111
-                lo_byte = ~status[n * 6 + 5] & 0b11111111
+                hi_byte = ~status[n * 6 + 4] & 0b11111111  # & to prevent negative integers
+                lo_byte = ~status[n * 6 + 5] & 0b11111111  # & to prevent negative integers
             else:
                 hi_byte = status[n * 6 + 4]
                 lo_byte = status[n * 6 + 5]
-
-            print("{:#010b} : {:d}".format(hi_byte, (hi_byte & 0b00001111) << 8))
-            print("{:#010b} : {:d}".format(lo_byte, lo_byte))
 
             self._int_vref_ep[n] = (hi_byte & 0b10000000) >> 7
             self._gains_ep[n] = (hi_byte & 0b00010000) >> 4
