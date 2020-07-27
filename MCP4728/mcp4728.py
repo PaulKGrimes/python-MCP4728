@@ -87,35 +87,16 @@ class MCP4728(object):
         """General software update of MCP4728 - All DAC outputs update"""
         return self._simple_command(_UPDATE)
 
-    def set_value_all(self, values):
-        """Write input register values to each channel using fast_write method.
-
-        Parameters:
-            values: list: of four integers in range 0-4095"""
-        if len(values) != 4:
-            raise ValueError("Must pass four values to be written")
-        self._values = values
-        return self.fast_write()
-
-    def set_value(self, channel, value):
-        """Write input register value to specified channel using fast_write method
-
-        parameters:
-            channel: int 0-3: input channel
-            value: int 0-4095: value to write"""
-        self._values[channel] = value
-        return self.fast_write()
-
     def eeprom_write_all(self):
         """Write all current values to each channel using Sequential Write method.
         This will update both the input register and EEProm stored values"""
-        self.seq_write()
+        self._seq_write()
         self.update_status(invert_eeprom=True)
 
     def eeprom_write(self, channel):
-        """Write current values to EEProm for channel using single_write method.
+        """Write current values to EEProm for channel using _single_write method.
         Will write all output values, Vref, PowerDown and Gain settings"""
-        self.single_write(channel)
+        self._single_write(channel)
         self.update_status(invert_eeprom=True)
 
     def eeprom_reset(self):
@@ -128,7 +109,7 @@ class MCP4728(object):
 
         self.eeprom_write_all()
 
-    def fast_write(self):
+    def _fast_write(self):
         """FastWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.1
         DAC Input and PowerDown bits update.
         No EEPROM update"""
@@ -141,7 +122,7 @@ class MCP4728(object):
 
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
-    def single_write(self, channel):
+    def _single_write(self, channel):
         """SingleWrite input register and EEPROM with a DAC output update.
         refer to DATASHEET 5.6.4
         DAC Input, Gain, Vref and PowerDown bits update
@@ -154,7 +135,7 @@ class MCP4728(object):
 
         self._bus.write_i2c_block_data(self._dev_address, first, [second, third])
 
-    def multi_write(self):
+    def _multi_write(self):
         """MultiWrite input register values - All DAC ouput update. refer to DATASHEET 5.6.2
         DAC Input, Gain, Vref and PowerDown bits update
         No EEPROM update"""
@@ -169,7 +150,7 @@ class MCP4728(object):
 
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
-    def seq_write(self, start_channel=0):
+    def _seq_write(self, start_channel=0):
         """Sequential Write ALL input register values - All DAC ouput update. refer to DATASHEET 5.6.2
         DAC Input, Gain, Vref and PowerDown bits update
         EEPROM is updated.
@@ -187,7 +168,32 @@ class MCP4728(object):
 
         self._bus.write_i2c_block_data(self._dev_address, block[0], block[1:])
 
-    def write_vref(self):
+    def set_value_all(self, values):
+        """Write input register values to each channel using _fast_write method.
+
+        Parameters:
+            values: list: of four integers in range 0-4095"""
+        if len(values) != 4:
+            raise ValueError("Must pass four values to be written")
+        self._values = values
+        return self._fast_write()
+
+    def set_value(self, channel, value):
+        """Write input register value to specified channel using _fast_write method.
+
+        parameters:
+            channel: int 0-3: input channel
+            value: int 0-4095: value to write"""
+        # Update status first, to make sure that software stored values are valid
+        # failure to do this can result in weird interactions if the DAC is being
+        # controlled by two or more software objects (we don't try and enforce single
+        # access)
+        self.update_status()
+
+        self._values[channel] = value
+        return self._fast_write()
+
+    def _write_vref(self):
         """Write the voltage reference settings to the input register"""
         data = _VREFWRITE | self._int_vref[0] << 3 | self._int_vref[1] << 2 | self._int_vref[2] << 1 | self._int_vref[3]
         self._bus.write_byte(self._dev_address, data)
@@ -202,20 +208,25 @@ class MCP4728(object):
         if len(values) != 4:
             raise ValueError("Must pass four values")
         self._int_vref = values
-        return self.write_vref()
+        return self._write_vref()
 
     def set_vref(self, channel, value):
         """Write the voltage reference settings for one channel to input registers.
 
         Parameters:
             channel :int: - channel number to write to.
-            value :int: - vref setting:
+            value   :int: - vref setting:
                             - 0: use vdd
                             - 1: use internal 2.048V reference."""
+        # Update status first, to make sure that software stored values are valid
+        # failure to do this can result in weird interactions if the DAC is being
+        # controlled by two or more software objects (we don't try and enforce single
+        # access)
+        self.update_status()
         self._int_vref[channel] = value
-        return self.write_vref()
+        return self._write_vref()
 
-    def write_gain(self):
+    def _write_gain(self):
         """Write the gain settings to the input register
         """
         data = _GAINWRITE | self._gains[0] << 3 | self._gains[1] << 2 | self._gains[2] << 1 | self._gains[3]
@@ -233,20 +244,25 @@ class MCP4728(object):
             raise ValueError("Must pass four values")
 
         self._gains = values
-        return self.write_gain()
+        return self._write_gain()
 
     def set_gain(self, channel, value):
         """Write the gain setting for one channel to input registers
 
         Parameters:
             channel :int: - channel number to write to.
-            value - :int: gain settings:
+            value :int: gain settings:
                             - 0: gain of 1
                             - 1: gain of 2."""
+        # Update status first, to make sure that software stored values are valid
+        # failure to do this can result in weird interactions if the DAC is being
+        # controlled by two or more software objects (we don't try and enforce single
+        # access)
+        self.update_status()
         self._gains[channel] = value
-        return self.write_gain()
+        return self._write_gain()
 
-    def write_power_down(self):
+    def _write_power_down(self):
         """Write the power down setting to the input register"""
         cmd = _PWRDOWNWRITE | self._power_down[0] << 2 | self._power_down[1]
         data = self._power_down[2] << 6 | self._power_down[3] << 4
@@ -264,19 +280,24 @@ class MCP4728(object):
             raise ValueError("Must pass four values")
 
         self._power_down = values
-        return self.write_power_down()
+        return self._write_power_down()
 
     def set_power_down(self, channel, value):
         """Write the power down setting for one channel to input registers
 
         Parameters:
             channel :int: - channel number to write to.
-            value - :int: power down settings:
+            value   :int: - power down settings:
                             - 0: channel on
                             - 1: channel off
         """
+        # Update status first, to make sure that software stored values are valid
+        # failure to do this can result in weird interactions if the DAC is being
+        # controlled by two or more software objects (we don't try and enforce single
+        # access)
+        self.update_status()
         self._power_down[channel] = value
-        return self.write_power_down()
+        return self._write_power_down()
 
     @property
     def device_id(self):
